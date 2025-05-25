@@ -1,0 +1,4 @@
+python-telegram-bot==20.3
+selenium==4.11.2
+pandas
+openpyxl
