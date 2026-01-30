@@ -6,13 +6,21 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from telegram import Update
-from telegram.ext import CommandHandler, ContextTypes
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    ContextTypes,
+)
 
 from engine import factor_scores, final_decision
 from formatter import telegram_formatter
 from hdp_engine import hdp_suggestion
 
 # ================= CONFIG =================
+BOT_TOKEN = os.getenv("BOT_TOKEN")          # ✅ BARU
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")      # ✅ BARU
+PORT = int(os.getenv("PORT", 8080))         # ✅ BARU
+
 API_KEY = os.getenv("API_KEY")
 ADMIN_IDS = {7952198349}
 
@@ -36,16 +44,20 @@ logger = logging.getLogger("BOT")
 def _today_str():
     return datetime.now(WITA).strftime("%Y-%m-%d")
 
+
 def fixture_cache_path():
     return os.path.join(CACHE_DIR, f"fixtures_{_today_str()}.json")
 
+
 def prediction_cache_path(fid: int):
     return os.path.join(CACHE_DIR, f"prediction_{fid}.json")
+
 
 USERS_FILE = os.path.join(CACHE_DIR, "users.json")
 
 # ================= CACHE CLEANUP =================
 LAST_CLEANUP = None
+
 
 def auto_cleanup_cache():
     global LAST_CLEANUP
@@ -77,6 +89,7 @@ def load_users():
     with open(USERS_FILE) as f:
         return json.load(f)
 
+
 def save_users(data):
     with open(USERS_FILE, "w") as f:
         json.dump(data, f, indent=2)
@@ -91,6 +104,7 @@ def fetch_fixtures():
     )
     r.raise_for_status()
     return r.json()["response"]
+
 
 def get_fixtures():
     path = fixture_cache_path()
@@ -179,6 +193,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🤖 Bot Prediksi Aktif\nGunakan /prediksi atau /rekomendasi"
     )
 
+
 async def prediksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     auto_cleanup_cache()
     fixtures = get_fixtures()
@@ -200,6 +215,7 @@ async def prediksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         await update.message.reply_text(text, parse_mode="Markdown")
+
 
 async def rekomendasi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     auto_cleanup_cache()
@@ -239,3 +255,23 @@ def register_handlers(app):
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("prediksi", prediksi))
     app.add_handler(CommandHandler("rekomendasi", rekomendasi))
+
+# ================= ENTRY POINT (WEBHOOK) =================
+def main():
+    if not BOT_TOKEN:
+        raise RuntimeError("BOT_TOKEN belum diset")
+
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    register_handlers(app)
+
+    logger.info("Bot running via webhook")
+
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        webhook_url=WEBHOOK_URL,
+    )
+
+
+if __name__ == "__main__":
+    main()
