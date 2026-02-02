@@ -173,12 +173,13 @@ def get_prediction(fixture):
     data = r.json()["response"]
     if not data:
         return None
-
+    
+    expires_at = (
+        datetime.fromisoformat(fixture["kickoff"]) - timedelta(minutes=30)
+    ).isoformat()
+    
     with open(path, "w") as f:
         json.dump({
-            expires_at = (
-                datetime.fromisoformat(fixture["kickoff"]) - timedelta(minutes=30)
-            ).isoformat()
             "expires_at": expires_at,
             "data": data[0]
         }, f)
@@ -294,5 +295,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
