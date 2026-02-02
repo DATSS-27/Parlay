@@ -17,9 +17,12 @@ from formatter import telegram_formatter
 from hdp_engine import hdp_suggestion
 
 # ================= CONFIG =================
-BOT_TOKEN = os.getenv("BOT_TOKEN")          # ✅ BARU
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")      # ✅ BARU
-PORT = int(os.getenv("PORT", 8080))         # ✅ BARU
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not API_KEY:
+    raise RuntimeError("API_KEY belum diset di environment")
+    
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")      
+PORT = int(os.getenv("PORT", 8080))       
 
 API_KEY = os.getenv("API_KEY")
 ADMIN_IDS = {7952198349}
@@ -51,6 +54,16 @@ def fixture_cache_path():
 
 def prediction_cache_path(fid: int):
     return os.path.join(CACHE_DIR, f"prediction_{fid}.json")
+
+def safe_get(url, **kwargs):
+    for _ in range(2):
+        try:
+            r = requests.get(url, **kwargs)
+            r.raise_for_status()
+            return r
+        except Exception:
+            continue
+    raise
 
 
 USERS_FILE = os.path.join(CACHE_DIR, "users.json")
@@ -96,7 +109,7 @@ def save_users(data):
 
 # ================= FIXTURE =================
 def fetch_fixtures():
-    r = requests.get(
+    r = safe_get(
         f"{API_URL}/fixtures",
         headers=HEADERS,
         params={"date": _today_str(), "status": "NS", "timezone": TIMEZONE},
@@ -149,7 +162,7 @@ def get_prediction(fixture):
             return payload["data"]
         os.remove(path)
 
-    r = requests.get(
+    r = safe_get(
         f"{API_URL}/predictions",
         headers=HEADERS,
         params={"fixture": fid},
@@ -163,7 +176,10 @@ def get_prediction(fixture):
 
     with open(path, "w") as f:
         json.dump({
-            "expires_at": fixture["kickoff"],
+            expires_at = (
+                datetime.fromisoformat(fixture["kickoff"]) - timedelta(minutes=30)
+            ).isoformat()
+            "expires_at": expires_at,
             "data": data[0]
         }, f)
 
@@ -215,7 +231,8 @@ async def prediksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
 
         await update.message.reply_text(text, parse_mode="Markdown")
-
+except Exception as e:
+    logger.exception("Error saat prediksi")
 
 async def rekomendasi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     auto_cleanup_cache()
@@ -249,6 +266,8 @@ async def rekomendasi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         idx += 1
 
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+except Exception as e:
+    logger.exception("Error saat prediksi")
 
 # ================= REGISTER =================
 def register_handlers(app):
@@ -275,3 +294,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
