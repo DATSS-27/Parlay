@@ -71,8 +71,6 @@ logger = logging.getLogger("BOT")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("telegram").setLevel(logging.WARNING)
 
-LAST_SCHEDULE_RUN = load_last_run()
-
 # ================= UTIL =================
 def _today_str():
     return datetime.now(WITA).strftime("%Y-%m-%d")
@@ -112,6 +110,8 @@ def load_last_run():
 def save_last_run(d: date):
     with open(LAST_RUN_FILE, "w") as f:
         f.write(d.isoformat())
+
+LAST_SCHEDULE_RUN = load_last_run()
 
 # ================= CACHE CLEANUP =================
 LAST_CLEANUP = None
@@ -507,6 +507,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
