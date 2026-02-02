@@ -18,13 +18,13 @@ from hdp_engine import hdp_suggestion
 
 # ================= CONFIG =================
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-if not API_KEY:
-    raise RuntimeError("API_KEY belum diset di environment")
-    
 WEBHOOK_URL = os.getenv("WEBHOOK_URL")      
 PORT = int(os.getenv("PORT", 8080))       
 
 API_KEY = os.getenv("API_KEY")
+if not API_KEY:
+    raise RuntimeError("API_KEY belum diset di environment")
+    
 ADMIN_IDS = {7952198349}
 
 API_URL = "https://v3.football.api-sports.io"
@@ -294,4 +294,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
