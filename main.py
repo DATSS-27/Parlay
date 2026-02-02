@@ -212,64 +212,71 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def prediksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    auto_cleanup_cache()
-    fixtures = get_fixtures()
-    now = datetime.now(WITA)
-
-    for f in fixtures:
-        if datetime.fromisoformat(f["kickoff"]) < now:
-            continue
-
-        pred = get_prediction(f)
-        if not pred:
-            continue
-
-        text = telegram_formatter(
-            fixture=f,
-            decision=final_decision(pred),
-            home_scores=factor_scores(pred, "home"),
-            away_scores=factor_scores(pred, "away")
+    try:    
+        auto_cleanup_cache()
+            fixtures = get_fixtures()
+            now = datetime.now(WITA)
+    
+        for f in fixtures:
+            if datetime.fromisoformat(f["kickoff"]) < now:
+                continue
+    
+            pred = get_prediction(f)
+            if not pred:
+                continue
+    
+            text = telegram_formatter(
+                fixture=f,
+                decision=final_decision(pred),
+                home_scores=factor_scores(pred, "home"),
+                away_scores=factor_scores(pred, "away")
+            )
+    
+            await update.message.reply_text(text, parse_mode="Markdown")
+    except Exception:
+        logger.exception("Error saat prediksi")
+        await update.message.reply_text(
+            "⚠️ Terjadi error saat memproses prediksi. Coba lagi nanti."
         )
-
-        await update.message.reply_text(text, parse_mode="Markdown")
-except Exception as e:
-    logger.exception("Error saat prediksi")
 
 async def rekomendasi(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    auto_cleanup_cache()
-    fixtures = get_fixtures()
-    now = datetime.now(WITA)
-
-    lines = [
-        "🧠 *REKOMENDASI HARI INI*",
-        f"📅 {now.strftime('%d %B %Y')}",
-        "━━━━━━━━━━━━━━━━━━━━"
-    ]
-
-    idx = 1
-    for f in fixtures:
-        if datetime.fromisoformat(f["kickoff"]) < now:
-            continue
-
-        pred = get_prediction(f)
-        if not pred:
-            continue
-
-        d = final_decision(pred)
-        hdp = hdp_suggestion(pred)
-
-        lines.append(
-            f"{idx}️⃣ *{f['home']} vs {f['away']}*\n"
-            f"🎯 PICK: {d['pick']}\n"
-            f"📈 Confidence: {d['confidence']}\n"
-            f"⚖️ HDP: HOME {hdp['hdp_home']} | AWAY {hdp['hdp_away']}\n"
+    try:
+        auto_cleanup_cache()
+        fixtures = get_fixtures()
+        now = datetime.now(WITA)
+    
+        lines = [
+            "🧠 *REKOMENDASI HARI INI*",
+            f"📅 {now.strftime('%d %B %Y')}",
+            "━━━━━━━━━━━━━━━━━━━━"
+        ]
+    
+        idx = 1
+        for f in fixtures:
+            if datetime.fromisoformat(f["kickoff"]) < now:
+                continue
+    
+            pred = get_prediction(f)
+            if not pred:
+                continue
+    
+            d = final_decision(pred)
+            hdp = hdp_suggestion(pred)
+    
+            lines.append(
+                f"{idx}️⃣ *{f['home']} vs {f['away']}*\n"
+                f"🎯 PICK: {d['pick']}\n"
+                f"📈 Confidence: {d['confidence']}\n"
+                f"⚖️ HDP: HOME {hdp['hdp_home']} | AWAY {hdp['hdp_away']}\n"
+            )
+            idx += 1
+    
+        await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+    except Exception:
+        logger.exception("Error saat prediksi")
+        await update.message.reply_text(
+            "⚠️ Terjadi error saat memproses prediksi. Coba lagi nanti."
         )
-        idx += 1
-
-    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
-except Exception as e:
-    logger.exception("Error saat prediksi")
-
 # ================= REGISTER =================
 def register_handlers(app):
     app.add_handler(CommandHandler("start", start))
@@ -295,6 +302,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
