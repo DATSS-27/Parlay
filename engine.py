@@ -64,6 +64,8 @@ def final_score(pred_resp: dict, side: str) -> float:
 def final_decision(pred_resp: dict) -> dict:
     home_score = final_score(pred_resp, "home")
     away_score = final_score(pred_resp, "away")
+    home_name = pred_resp["teams"]["home"]["name"]
+        away_name = pred_resp["teams"]["away"]["name"]
 
     diff = round(abs(home_score - away_score), 2)
 
@@ -71,11 +73,11 @@ def final_decision(pred_resp: dict) -> dict:
         pick = "DRAW / DOUBLE CHANCE"
         note = "Kekuatan relatif seimbang"
     elif home_score > away_score:
-        pick = pred_resp["teams"]["home"]["name"]
-        note = "HOME unggul berdasarkan agregat data"
+        pick = home_name
+        note = f"{home_name} unggul berdasarkan agregat data"
     else:
-        pick = pred_resp["teams"]["away"]["name"]
-        note = "AWAY unggul berdasarkan agregat data"
+        pick = away_name
+        note = f"{away_name} unggul berdasarkan agregat data"
 
     confidence = (
         "🟢 Resiko Rendah" if diff >= 15 else
@@ -91,5 +93,6 @@ def final_decision(pred_resp: dict) -> dict:
         "confidence": confidence,
         "note": note,
     }
+
 
 
