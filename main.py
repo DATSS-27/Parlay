@@ -33,7 +33,6 @@ WITA = ZoneInfo(TIMEZONE)
 
 CACHE_DIR = os.getenv("CACHE_DIR", "/app/cache")
 os.makedirs(CACHE_DIR, exist_ok=True)
-LAST_RUN_FILE = os.path.join(CACHE_DIR, "last_schedule_run.txt")
 
 ALLOWED_LEAGUES = {
     1, 2, 3, 39, 61, 78, 88, 98, 113, 119, 140, 144, 253, 292, 307
@@ -96,23 +95,6 @@ def safe_get(url, **kwargs):
 
 
 USERS_FILE = os.path.join(CACHE_DIR, "users.json")
-
-def load_last_run():
-    if os.path.exists(LAST_RUN_FILE):
-        try:
-            with open(LAST_RUN_FILE) as f:
-                return date.fromisoformat(f.read().strip())
-        except Exception:
-            return None
-    return None
-
-
-def save_last_run(d: date):
-    with open(LAST_RUN_FILE, "w") as f:
-        f.write(d.isoformat())
-
-LAST_SCHEDULE_RUN = load_last_run()
-
 # ================= CACHE CLEANUP =================
 LAST_CLEANUP = None
 
@@ -419,66 +401,6 @@ async def jadwal(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "⚠️ Terjadi error saat mengambil jadwal. Coba lagi nanti."
         )
 
-async def notify_users_fixtures(app, fixtures):
-    users = load_users()
-    if not users:
-        return
-
-    now = datetime.now(WITA)
-
-    lines = [
-        "📅 *JADWAL PERTANDINGAN*",
-        f"🕐 Update: {now.strftime('%d %B %Y')} (Hari ini & Besok)",
-        "━━━━━━━━━━━━━━━━━━━━"
-    ]
-
-    for f in fixtures:
-        kickoff = datetime.fromisoformat(f["kickoff"])
-        if kickoff < now:
-            continue
-
-        lines.append(
-            f"⚽ {f['home']} vs {f['away']}\n"
-            f"🏆 {f['league_name']} | ⏰ {kickoff.strftime('%d %b %H:%M')} WITA\n"
-        )
-
-        if len(lines) >= 20:  # batasi panjang
-            break
-
-    message = "\n".join(lines)
-
-    for uid in users:
-        try:
-            await app.bot.send_message(
-                chat_id=int(uid),
-                text=message,
-                parse_mode="Markdown"
-            )
-        except Exception:
-            continue
-
-async def daily_fixture_job(app):
-    global LAST_SCHEDULE_RUN
-
-    while True:
-        now = datetime.now(WITA)
-
-        if now.hour == 1 and (
-            LAST_SCHEDULE_RUN is None or LAST_SCHEDULE_RUN != now.date()
-        ):
-            try:
-                fixtures = get_fixtures()  # fetch + cache
-                await notify_users_fixtures(app, fixtures)
-
-                LAST_SCHEDULE_RUN = now.date()
-                save_last_run(LAST_SCHEDULE_RUN)
-
-                logger.info("✅ Daily fixture job executed")
-            except Exception:
-                logger.exception("❌ Daily fixture job failed")
-
-        await asyncio.sleep(900)
-
 # ================= REGISTER =================
 def register_handlers(app):
     app.add_handler(CommandHandler("start", start))
@@ -494,8 +416,6 @@ def main():
 
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     register_handlers(app)
-    
-    app.create_task(daily_fixture_job(app))
 
     logger.info("🤖 Bot running via polling (Railway safe mode)")
 
@@ -507,6 +427,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
