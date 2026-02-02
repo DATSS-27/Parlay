@@ -291,17 +291,17 @@ def main():
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     register_handlers(app)
 
-    logger.info("Bot running via webhook")
+    logger.info("🤖 Bot running via polling (Railway safe mode)")
 
-    app.run_webhook(
-        listen="0.0.0.0",
-        port=PORT,
-        webhook_url=WEBHOOK_URL,
+    app.run_polling(
+        allowed_updates=Update.ALL_TYPES,
+        close_loop=False
     )
 
 
 if __name__ == "__main__":
     main()
+
 
 
 
