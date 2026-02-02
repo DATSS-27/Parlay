@@ -65,7 +65,7 @@ def final_decision(pred_resp: dict) -> dict:
     home_score = final_score(pred_resp, "home")
     away_score = final_score(pred_resp, "away")
     home_name = pred_resp["teams"]["home"]["name"]
-        away_name = pred_resp["teams"]["away"]["name"]
+    away_name = pred_resp["teams"]["away"]["name"]
 
     diff = round(abs(home_score - away_score), 2)
 
@@ -93,6 +93,7 @@ def final_decision(pred_resp: dict) -> dict:
         "confidence": confidence,
         "note": note,
     }
+
 
 
 
