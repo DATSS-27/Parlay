@@ -38,7 +38,7 @@ def factor_scores(pred_resp: dict, side: str) -> dict:
 
     return {
         "percent": pct(pred["percent"].get(side)),
-        "last5_form": pct(team["last_5"].get("form")),
+        "last5_form": league_form_score(team["last_5"].get("form")),
         "attack": pct(team["last_5"].get("att")),
         "defense": pct(team["last_5"].get("def")),
         "goals_avg": clamp(float(goals_for) * 20),
@@ -91,3 +91,4 @@ def final_decision(pred_resp: dict) -> dict:
         "confidence": confidence,
         "note": note,
     }
+
