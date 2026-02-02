@@ -214,8 +214,8 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def prediksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:    
         auto_cleanup_cache()
-            fixtures = get_fixtures()
-            now = datetime.now(WITA)
+        fixtures = get_fixtures()
+        now = datetime.now(WITA)
     
         for f in fixtures:
             if datetime.fromisoformat(f["kickoff"]) < now:
@@ -302,6 +302,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
