@@ -371,6 +371,11 @@ async def prediksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
             idx += 1
 
+            lines.append(
+                "Note:\n"
+                "*DONASI FOR BAYAR SERVER ISAKU 081343924182*"
+            )
+        
         await update.message.reply_text(
             "\n".join(lines),
             parse_mode="Markdown"
@@ -452,6 +457,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
