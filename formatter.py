@@ -68,18 +68,16 @@ def telegram_formatter_technical(
     lines: list[str] = []
 
     # ===== HEADER =====
-    lines.append("*STATISTICAL MATCH PROFILE*")
-    lines.append(f"League : {fixture['league_name']}")
+    lines.append("*{fixture['league_name']}*")
     lines.append(
-        f"Match  : {fixture['home']} vs {fixture['away']}"
+        f"*{fixture['home']} vs {fixture['away']}*"
     )
-    lines.append(f"Kickoff: {kickoff.strftime('%H:%M')} WITA\n")
+    lines.append(f"*{kickoff.strftime('%H:%M')} WITA\n*")
 
     # ===== SUMMARY =====
-    lines.append("*AGGREGATED POWER INDEX*")
-    lines.append(f"HOME : {home_total:.1f}")
-    lines.append(f"AWAY : {away_total:.1f}")
-    lines.append(f"DELTA: {delta:+.1f}\n")
+    lines.append("*PERBANDINGAN*")
+    lines.append(f"{fixture['home']} ({home_total:.1f}) VS {fixture['away']} ({away_total:.1f})")
+    lines.append(f"Selisih : {delta:+.1f}\n")
 
     # ===== TECH INSIGHT =====
     insights = build_insight(
@@ -89,26 +87,26 @@ def telegram_formatter_technical(
         fixture["away"],
     )
     if insights:
-        lines.append("*KEY PERFORMANCE SIGNALS*")
+        lines.append("*ANALISA*")
         for i in insights:
             lines.append(f"- {i}")
         lines.append("")
 
     # ===== TABLE =====
-    lines.append("*DETAILED FACTOR COMPARISON*")
+    lines.append("*STATISTIK*")
     lines.append("```")
     lines.append(f"{'FACTOR':<20}{'HOME':>7}{'AWAY':>7}")
     lines.append("-" * 34)
 
     factors = [
-        ("percent", "Win Probability %"),
-        ("last5_form", "Recent Form"),
-        ("attack", "Attack Index"),
-        ("defense", "Defense Index"),
-        ("goals_for", "Goals Scored Avg"),
-        ("goals_against", "Goals Conceded Adj"),
-        ("league_form", "League Form Index"),
-        ("h2h", "H2H Index"),
+        ("percent", "Peluang Menang"),
+        ("last5_form", "5 Laga Terakhir"),
+        ("attack", "Kualitas Serangan"),
+        ("defense", "Kualitas Pertahanan"),
+        ("goals_for", "Rata-rata Gol"),
+        ("goals_against", "Kebobolan"),
+        ("league_form", "Performa Liga"),
+        ("h2h", "Rekor H2H"),
     ]
 
     for key, label in factors:
@@ -129,8 +127,8 @@ def telegram_formatter_technical(
     # ===== FOOTNOTE =====
     lines.append(
         "Note:\n"
-        "Aggregated index derived from weighted multi-factor model. "
-        "Lower delta implies higher outcome variance."
+        "*Rumus Sandiri Jo, Supaya kita nda dpa kse salah...*"
     )
 
     return "\n".join(lines)
+
