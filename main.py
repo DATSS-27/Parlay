@@ -324,14 +324,16 @@ async def prediksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # PART 1: DETAIL PREDIKSI (SEPERTI AWAL)
         # =====================
         for f, pred in results:
+            decision = final_decision(pred)
+
             text = telegram_formatter_technical(
                 fixture=f,
                 home_scores=factor_scores(pred, "home"),
                 away_scores=factor_scores(pred, "away"),
-                home_total=final_score(pred, "home"),
-                away_total=final_score(pred, "away"),
+                home_total=decision["home_score"],
+                away_total=decision["away_score"],
             )
-            
+
             await update.message.reply_text(text, parse_mode="Markdown")
 
 
@@ -457,6 +459,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
