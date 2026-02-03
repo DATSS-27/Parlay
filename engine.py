@@ -12,11 +12,22 @@ def pct(val) -> float:
 def clamp(v: float, lo=0.0, hi=100.0) -> float:
     return max(lo, min(v, hi))
 
+def confidence_percent(diff: float) -> int:
+    """
+    Convert selisih skor → confidence %
+    """
+    # diff 0–30 kira-kira
+    base = diff * 3.5          # scaling
+    conf = 50 + base           # mulai dari 50%
 
+    return int(clamp(conf, 52, 92))
 # ================= LEAGUE FORM =================
 def league_form_score(form: str) -> float:
+    """
+    W = 100, D = 50, L = 0
+    """
     if not form:
-        return 0.0
+        return 50.0  # netral
 
     values = [
         100 if c == "W" else
@@ -33,30 +44,50 @@ def factor_scores(pred_resp: dict, side: str) -> dict:
     pred = pred_resp["predictions"]
     comp = pred_resp.get("comparison", {})
 
-    goals_for = team["last_5"]["goals"]["for"].get("average", 0)
-    goals_against = team["last_5"]["goals"]["against"].get("average", 0)
+    goals_for = float(team["last_5"]["goals"]["for"].get("average", 0))
+    goals_against = float(team["last_5"]["goals"]["against"].get("average", 0))
 
     return {
-        "percent": pct(pred["percent"].get(side)),
-        "last5_form": pct(team["last_5"].get("form")),
-        "attack": pct(team["last_5"].get("att")),
-        "defense": pct(team["last_5"].get("def")),
-        "goals_avg": clamp(float(goals_for) * 20),
-        "concede_avg": clamp(100 - float(goals_against) * 20),
+        # === CORE ===
+        "percent": clamp(pct(pred["percent"].get(side))),
+        "last5_form": clamp(pct(team["last_5"].get("form"))),
+        "attack": clamp(pct(team["last_5"].get("att"))),
+        "defense": clamp(pct(team["last_5"].get("def"))),
+
+        # === GOALS ===
+        "goals_for": clamp(goals_for * 20),          # 2.5 gol ≈ 50
+        "goals_against": clamp(100 - goals_against * 20),
+
+        # === SUPPORT ===
         "league_form": league_form_score(
             team.get("league", {}).get("form", "")
         ),
-        "h2h": pct(comp.get("h2h", {}).get(side)),
-        "comparison_total": pct(comp.get("total", {}).get(side)),
+        "h2h": clamp(pct(comp.get("h2h", {}).get(side))),
     }
 
 
-# ================= FINAL SCORE =================
-WEIGHT = 1 / 9  # 11.11%
+# ================= WEIGHT CONFIG =================
+WEIGHTS = {
+    "percent": 0.22,
+    "last5_form": 0.14,
+    "attack": 0.14,
+    "defense": 0.14,
+    "goals_for": 0.12,
+    "goals_against": 0.12,
+    "league_form": 0.07,
+    "h2h": 0.05,
+}
 
+
+# ================= FINAL SCORE =================
 def final_score(pred_resp: dict, side: str) -> float:
     scores = factor_scores(pred_resp, side)
-    total = sum(v * WEIGHT for v in scores.values())
+    total = 0.0
+
+    for k, v in scores.items():
+        w = WEIGHTS.get(k, 0)
+        total += v * w
+
     return round(total, 2)
 
 
@@ -64,24 +95,29 @@ def final_score(pred_resp: dict, side: str) -> float:
 def final_decision(pred_resp: dict) -> dict:
     home_score = final_score(pred_resp, "home")
     away_score = final_score(pred_resp, "away")
+
     home_name = pred_resp["teams"]["home"]["name"]
     away_name = pred_resp["teams"]["away"]["name"]
 
     diff = round(abs(home_score - away_score), 2)
 
-    if diff < 5:
+    # === PICK LOGIC ===
+    if diff < 4:
         pick = "DRAW / DOUBLE CHANCE"
-        note = "Kekuatan relatif seimbang"
+        note = "Kekuatan kedua tim sangat berimbang"
     elif home_score > away_score:
         pick = home_name
-        note = f"{home_name} unggul berdasarkan agregat data"
+        note = f"{home_name} unggul secara statistik"
     else:
         pick = away_name
-        note = f"{away_name} unggul berdasarkan agregat data"
+        note = f"{away_name} unggul secara statistik"
 
-    confidence = (
-        "🟢 Resiko Rendah" if diff >= 15 else
-        "🟡 Resiko Sedang" if diff >= 8 else
+    # === CONFIDENCE ===
+    conf_pct = confidence_percent(diff)
+
+    confidence_label = (
+        "🟢 Resiko Rendah" if conf_pct >= 80 else
+        "🟡 Resiko Sedang" if conf_pct >= 65 else
         "🚨 Resiko Tinggi"
     )
 
@@ -93,7 +129,3 @@ def final_decision(pred_resp: dict) -> dict:
         "confidence": confidence,
         "note": note,
     }
-
-
-
-
