@@ -17,7 +17,7 @@ from telegram.ext import (
 
 from engine import factor_scores, final_decision
 from formatter import telegram_formatter
-from hdp_engine import hdp_suggestion
+from hdp_engine import hdp_suggestion, hdp_confidence
 
 # ================= CONFIG =================
 BOT_TOKEN = os.getenv("BOT_TOKEN")      
@@ -242,6 +242,15 @@ def collect_predictions():
 
     return results
 
+def hdp_confidence_label(score: float):
+    if score >= 75:
+        return "🟢 Sangat Kuat"
+    elif score >= 60:
+        return "🟡 Cukup Aman"
+    elif score >= 45:
+        return "🟠 Spekulatif"
+    else:
+        return "🔴 Hindari"
 
 # ================= HANDLERS =================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -339,11 +348,21 @@ async def prediksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
             d = final_decision(pred)
             hdp = hdp_suggestion(pred)
 
+            hdp_conf = hdp_confidence(
+                hdp_resp=hdp,
+                home_xg=hdp.get("home_xg", 0),
+                away_xg=hdp.get("away_xg", 0),
+            )
+            
+            label = hdp_confidence_label(hdp_conf)
+            
             lines.append(
                 f"{idx}️⃣ *{f['home']} vs {f['away']}*\n"
-                f"🎯 Diunggulkan: {d['pick']}\n"
-                f"📈 Tingkat Resiko: {d['confidence']}\n"
-                f"⚖️ HDP: HOME {hdp['hdp_home']} | AWAY {hdp['hdp_away']}\n"
+                f"🎯 Unggulan: {d['pick']}\n"
+                f"📊 Winner Risk: {d['confidence']}\n\n"
+                f"⚖️ *HDP Rekomendasi*\n"
+                f"• HOME {hdp['hdp_home']} | AWAY {hdp['hdp_away']}\n"
+                f"• HDP Confidence: *{hdp_conf:.0f}%* {label}\n"
             )
             idx += 1
 
@@ -428,6 +447,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
