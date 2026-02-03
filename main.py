@@ -15,7 +15,7 @@ from telegram.ext import (
     filters,
 )
 
-from engine import factor_scores, final_decision
+from engine import factor_scores, final_decision, sync_confidence
 from formatter import telegram_formatter
 from hdp_engine import hdp_suggestion, hdp_confidence
 
@@ -83,6 +83,9 @@ def fixture_cache_path():
 
 def prediction_cache_path(fid: int):
     return os.path.join(CACHE_DIR, f"prediction_{fid}.json")
+
+def extract_confidence_percent(conf_str: str) -> int:
+    return int(conf_str.split("(")[1].replace("%)", ""))
 
 def safe_get(url, **kwargs):
     for _ in range(2):
@@ -347,13 +350,13 @@ async def prediksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for f, pred in results:
             d = final_decision(pred)
             hdp = hdp_suggestion(pred)
-
+            winner_conf = extract_confidence_percent(d["confidence"])
             hdp_conf = hdp_confidence(
                 hdp_resp=hdp,
                 home_xg=hdp.get("home_xg", 0),
                 away_xg=hdp.get("away_xg", 0),
             )
-            
+            sync = sync_confidence(winner_conf, hdp_conf)
             label = hdp_confidence_label(hdp_conf)
             
             lines.append(
@@ -362,7 +365,9 @@ async def prediksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"📊 Winner Risk: {d['confidence']}\n\n"
                 f"⚖️ *HDP Rekomendasi*\n"
                 f"• HOME {hdp['hdp_home']} | AWAY {hdp['hdp_away']}\n"
-                f"• HDP Confidence: *{hdp_conf:.0f}%* {label}\n"
+                f"• HDP Confidence: *{hdp_conf:.0f}%* {label}\n\n"
+                f"{sync['tag']}\n"
+                f"🧠 {sync['note']}\n"
             )
             idx += 1
 
@@ -447,6 +452,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
