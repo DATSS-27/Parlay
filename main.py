@@ -345,7 +345,7 @@ async def prediksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         lines = [
             "🧠 *REKOMENDASI HARI INI*",
             f"📅 {now.strftime('%d %B %Y')}",
-            "━━━━━━━━━━━━━━━━━━━━"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━"
         ]
 
         idx = 1
@@ -372,11 +372,11 @@ async def prediksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"🧠 {sync['note']}\n"
             )
             idx += 1
-
-            lines.append(
-                "Note:\n"
-                "*DONASI FOR BAYAR SERVER ISAKU 081343924182*"
-            )
+        
+        lines = [
+            "TERIMA DONASI FOR SERVER, ISAKU 081343924182",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        ]
         
         await update.message.reply_text(
             "\n".join(lines),
@@ -459,6 +459,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
