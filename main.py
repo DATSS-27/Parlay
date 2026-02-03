@@ -16,7 +16,7 @@ from telegram.ext import (
 )
 
 from engine import factor_scores, final_decision, sync_confidence
-from formatter import telegram_formatter
+from formatter import telegram_formatter_technical
 from hdp_engine import hdp_suggestion, hdp_confidence
 
 # ================= CONFIG =================
@@ -324,16 +324,16 @@ async def prediksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # PART 1: DETAIL PREDIKSI (SEPERTI AWAL)
         # =====================
         for f, pred in results:
-            text = telegram_formatter(
+            text = telegram_formatter_technical(
                 fixture=f,
-                decision=final_decision(pred),
                 home_scores=factor_scores(pred, "home"),
-                away_scores=factor_scores(pred, "away")
+                away_scores=factor_scores(pred, "away"),
+                home_total=final_score(pred, "home"),
+                away_total=final_score(pred, "away"),
             )
-            await update.message.reply_text(
-                text,
-                parse_mode="Markdown"
-            )
+            
+            await update.message.reply_text(text, parse_mode="Markdown")
+
 
         # =====================
         # PART 2: REKOMENDASI (DITARUH DI AKHIR)
@@ -457,6 +457,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
