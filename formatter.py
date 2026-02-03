@@ -3,137 +3,134 @@ from zoneinfo import ZoneInfo
 
 WITA = ZoneInfo("Asia/Makassar")
 
-# ================= CONFIG =================
-FACTOR_LABELS = [
-    ("percent", "Percent"),
-    ("last5_form", "Last 5 Form"),
-    ("attack", "Attack"),
-    ("defense", "Defense"),
-    ("goals_avg", "Goals Avg"),
-    ("concede_avg", "Concede Avg"),
-    ("league_form", "League Form"),
-    ("h2h", "H2H"),
-    ("comparison_total", "Comparison Tot"),
-]
 
-
-def format_score(v: float | None) -> str:
+def fmt(v: float | None) -> str:
     if v is None:
         return "  -  "
     return f"{v:>6.1f}"
 
 
-# ================= AUTO INSIGHT =================
-def build_insight(home_scores: dict, away_scores: dict) -> list[str]:
-    notes = []
-
-    if home_scores["defense"] > away_scores["defense"] + 10:
-        notes.append("🛡 Defense HOME lebih solid")
-
-    if home_scores["attack"] > away_scores["attack"] + 10:
-        notes.append("⚔️ Serangan HOME lebih tajam")
-
-    if home_scores.get("h2h") == 100:
-        notes.append("📊 Rekor H2H sepenuhnya milik HOME")
-
-    if away_scores["attack"] > home_scores["attack"] + 10:
-        notes.append("⚠️ AWAY unggul di sektor serangan")
-
-    if abs(home_scores["league_form"] - away_scores["league_form"]) < 5:
-        notes.append("⚖️ Performa liga relatif seimbang")
-
-    return notes[:3]  # maksimal 3 insight
-
-
-# ================= FORMATTER =================
-def telegram_formatter(
-    fixture: dict,
-    decision: dict,
+# ================= TECH INSIGHT =================
+def build_insight(
     home_scores: dict,
     away_scores: dict,
-    hdp: dict | None = None,
+    home_name: str,
+    away_name: str,
+) -> list[str]:
+    notes = []
+
+    def diff(a, b):
+        return round(a - b)
+
+    # === ATTACK ===
+    d = diff(home_scores["attack"], away_scores["attack"])
+    if abs(d) >= 8:
+        winner = home_name if d > 0 else away_name
+        notes.append(f"⚔️ Serangan {winner} lebih tajam +{abs(d)}")
+
+    # === DEFENSE ===
+    d = diff(home_scores["defense"], away_scores["defense"])
+    if abs(d) >= 8:
+        winner = home_name if d > 0 else away_name
+        notes.append(f"🛡 Pertahanan {winner} lebih solid +{abs(d)}")
+
+    # === LEAGUE FORM ===
+    d = diff(home_scores["league_form"], away_scores["league_form"])
+
+    if abs(d) < 5:
+        notes.append("⚖️ Performa liga hampir seimbang")
+    else:
+        winner = home_name if d > 0 else away_name
+        notes.append(f"📈 Performa liga {winner} lebih stabil +{abs(d)}")
+        
+    # === H2H ===
+    if home_scores.get("h2h", 0) >= 80:
+        notes.append(f"📊 Rekor pertemuan berpihak ke {home_name}")
+    elif away_scores.get("h2h", 0) >= 80:
+        notes.append(f"📊 Rekor pertemuan berpihak ke {away_name}")
+
+    return notes[:3]
+
+# ================= FORMATTER (TECHNICAL) =================
+def telegram_formatter_technical(
+    fixture: dict,
+    home_scores: dict,
+    away_scores: dict,
+    home_total: float,
+    away_total: float,
 ) -> str:
-    kickoff = datetime.fromisoformat(fixture["kickoff"]).astimezone(WITA)
-    kickoff_str = kickoff.strftime("%H:%M")
+    kickoff = datetime.fromisoformat(
+        fixture["kickoff"]
+    ).astimezone(WITA)
+
+    delta = round(home_total - away_total, 2)
 
     lines: list[str] = []
 
     # ===== HEADER =====
-    lines.append("📊 *ANALISIS & PREDIKSI PERTANDINGAN*\n")
-    lines.append(f"🏆 *{fixture['league_name']}*")
-    lines.append(f"⚽ *{fixture['home']}* vs *{fixture['away']}*")
-    lines.append(f"⏰ Kickoff: {kickoff_str} WITA\n")
+    lines.append("*STATISTICAL MATCH PROFILE*")
+    lines.append(f"League : {fixture['league_name']}")
+    lines.append(
+        f"Match  : {fixture['home']} vs {fixture['away']}"
+    )
+    lines.append(f"Kickoff: {kickoff.strftime('%H:%M')} WITA\n")
 
-    # ===== MAIN PICK =====
-    lines.append("━━━━━━━━━━━━━━━━━━━━")
-    lines.append("🎯 *REKOMENDASI UTAMA*")
-    lines.append("━━━━━━━━━━━━━━━━━━━━")
-    lines.append(f"✅ *PICK*: {decision['pick']}")
-    lines.append(f"📈 *CONFIDENCE*: {decision['confidence']}")
-    lines.append(f"📝 {decision['note']}\n")
+    # ===== SUMMARY =====
+    lines.append("*AGGREGATED POWER INDEX*")
+    lines.append(f"HOME : {home_total:.1f}")
+    lines.append(f"AWAY : {away_total:.1f}")
+    lines.append(f"DELTA: {delta:+.1f}\n")
 
-    # ===== HDP SECTION =====
-    if hdp:
-        lines.append("━━━━━━━━━━━━━━━━━━━━")
-        lines.append("⚖️ *REKOMENDASI HANDICAP (HDP)*")
-        lines.append("━━━━━━━━━━━━━━━━━━━━")
-
-        model = hdp.get("model", "poisson").upper()
-
-        lines.append(
-            f"🏠 *HOME*: {hdp['hdp_home']} "
-            f"(Prob: {hdp.get('home_prob', 0):.1%})"
-        )
-        lines.append(
-            f"🚩 *AWAY*: {hdp['hdp_away']} "
-            f"(Prob: {hdp.get('away_prob', 0):.1%})"
-        )
-
-        if "draw_prob" in hdp:
-            lines.append(
-                f"🤝 *DRAW PROB*: {hdp['draw_prob']:.1%}"
-            )
-
-        lines.append(f"🧮 Model: `{model}`\n")
-
-    # ===== INSIGHT =====
-    insights = build_insight(home_scores, away_scores)
+    # ===== TECH INSIGHT =====
+    insights = build_insight(
+        home_scores,
+        away_scores,
+        fixture["home"],
+        fixture["away"],
+    )
     if insights:
-        lines.append("━━━━━━━━━━━━━━━━━━━━")
-        lines.append("📈 *RINGKASAN ANALISIS*")
-        lines.append("━━━━━━━━━━━━━━━━━━━━")
-        for note in insights:
-            lines.append(f"• {note}")
+        lines.append("*KEY PERFORMANCE SIGNALS*")
+        for i in insights:
+            lines.append(f"- {i}")
         lines.append("")
 
     # ===== TABLE =====
-    lines.append("━━━━━━━━━━━━━━━━━━━━")
-    lines.append("📊 *PERBANDINGAN DATA*")
-    lines.append("━━━━━━━━━━━━━━━━━━━━")
+    lines.append("*DETAILED FACTOR COMPARISON*")
     lines.append("```")
-    lines.append(f"{'FAKTOR':<18}{'HOME':>7}{'AWAY':>7}")
-    lines.append("-" * 32)
+    lines.append(f"{'FACTOR':<20}{'HOME':>7}{'AWAY':>7}")
+    lines.append("-" * 34)
 
-    for key, label in FACTOR_LABELS:
+    factors = [
+        ("percent", "Win Probability %"),
+        ("last5_form", "Recent Form"),
+        ("attack", "Attack Index"),
+        ("defense", "Defense Index"),
+        ("goals_for", "Goals Scored Avg"),
+        ("goals_against", "Goals Conceded Adj"),
+        ("league_form", "League Form Index"),
+        ("h2h", "H2H Index"),
+    ]
+
+    for key, label in factors:
         lines.append(
-            f"{label:<18}"
-            f"{format_score(home_scores.get(key))}"
-            f"{format_score(away_scores.get(key))}"
+            f"{label:<20}"
+            f"{fmt(home_scores.get(key))}"
+            f"{fmt(away_scores.get(key))}"
         )
 
-    lines.append("-" * 32)
+    lines.append("-" * 34)
     lines.append(
-        f"{'TOTAL SCORE':<18}"
-        f"{format_score(decision['home_score'])}"
-        f"{format_score(decision['away_score'])}"
+        f"{'TOTAL SCORE':<20}"
+        f"{fmt(home_total)}"
+        f"{fmt(away_total)}"
     )
     lines.append("```")
 
     # ===== FOOTNOTE =====
     lines.append(
-        "ℹ️ Prediksi berbasis agregasi 9 faktor statistik & "
-        "model probabilistik Poisson untuk HDP. "
-        "Confidence rendah menandakan potensi hasil terbuka."
+        "Note:\n"
+        "Aggregated index derived from weighted multi-factor model. "
+        "Lower delta implies higher outcome variance."
     )
 
     return "\n".join(lines)
