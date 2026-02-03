@@ -21,6 +21,10 @@ def confidence_percent(diff: float) -> int:
     conf = 50 + base           # mulai dari 50%
 
     return int(clamp(conf, 52, 92))
+
+def extract_confidence_percent(conf_str: str) -> int:
+    return int(conf_str.split("(")[1].replace("%)", ""))
+
 # ================= LEAGUE FORM =================
 def league_form_score(form: str) -> float:
     """
@@ -37,6 +41,30 @@ def league_form_score(form: str) -> float:
     ]
     return sum(values) / len(values)
 
+def build_insight_note(home_scores: dict, away_scores: dict,
+                       home_name: str, away_name: str,
+                       diff: float) -> str:
+    reasons = []
+
+    def better(k, label):
+        if home_scores[k] - away_scores[k] >= 8:
+            reasons.append(f"{label} {home_name}")
+        elif away_scores[k] - home_scores[k] >= 8:
+            reasons.append(f"{label} {away_name}")
+
+    better("attack", "serangan lebih tajam oleh")
+    better("defense", "pertahanan lebih solid oleh")
+    better("last5_form", "performa terkini lebih konsisten oleh")
+    better("goals_for", "produktivitas gol lebih baik dari")
+    better("league_form", "rekam jejak liga lebih baik milik")
+
+    if diff < 4:
+        return "Kekuatan kedua tim sangat berimbang, potensi hasil imbang cukup tinggi"
+
+    if not reasons:
+        return "Perbedaan tipis, keunggulan tidak terlalu dominan"
+
+    return " & ".join(reasons[:2])
 
 # ================= FACTOR SCORES =================
 def factor_scores(pred_resp: dict, side: str) -> dict:
@@ -93,32 +121,45 @@ def final_score(pred_resp: dict, side: str) -> float:
 
 # ================= FINAL DECISION =================
 def final_decision(pred_resp: dict) -> dict:
-    home_score = final_score(pred_resp, "home")
-    away_score = final_score(pred_resp, "away")
-
     home_name = pred_resp["teams"]["home"]["name"]
     away_name = pred_resp["teams"]["away"]["name"]
 
+    # === HITUNG SCORE ===
+    home_score = final_score(pred_resp, "home")
+    away_score = final_score(pred_resp, "away")
+
     diff = round(abs(home_score - away_score), 2)
+
+    # === AMBIL DETAIL FACTOR ===
+    home_scores = factor_scores(pred_resp, "home")
+    away_scores = factor_scores(pred_resp, "away")
 
     # === PICK LOGIC ===
     if diff < 4:
         pick = "DRAW / DOUBLE CHANCE"
-        note = "Kekuatan kedua tim sangat berimbang"
     elif home_score > away_score:
         pick = home_name
-        note = f"{home_name} unggul secara statistik"
     else:
         pick = away_name
-        note = f"{away_name} unggul secara statistik"
 
-    # === CONFIDENCE ===
+    # === CONFIDENCE NUMERIK ===
     conf_pct = confidence_percent(diff)
 
     confidence_label = (
         "🟢 Resiko Rendah" if conf_pct >= 80 else
         "🟡 Resiko Sedang" if conf_pct >= 65 else
         "🚨 Resiko Tinggi"
+    )
+
+    confidence = f"{confidence_label} ({conf_pct}%)"
+
+    # === NOTE / INSIGHT ===
+    note = build_insight_note(
+        home_scores=home_scores,
+        away_scores=away_scores,
+        home_name=home_name,
+        away_name=away_name,
+        diff=diff
     )
 
     return {
@@ -128,4 +169,36 @@ def final_decision(pred_resp: dict) -> dict:
         "pick": pick,
         "confidence": confidence,
         "note": note,
+    }
+
+def sync_confidence(winner_conf: int, hdp_conf: int) -> dict:
+    """
+    Sinkronisasi Winner Confidence & HDP Confidence
+    Tujuan: menentukan PASAR yang paling layak dimainkan
+    """
+    if winner_conf >= 80 and hdp_conf >= 75:
+        return {
+            "tag": "🔥 IDEAL HDP",
+            "decision": "HDP FAVORIT",
+            "note": "Tim unggul kuat dan berpeluang besar menutup handicap"
+        }
+
+    if winner_conf >= 80 and hdp_conf < 65:
+        return {
+            "tag": "⚠️ WIN ONLY",
+            "decision": "MENANG SAJA",
+            "note": "Tim unggul, namun margin kemenangan beresiko untuk HDP"
+        }
+
+    if winner_conf < 70 and hdp_conf >= 75:
+        return {
+            "tag": "💎 VALUE HDP",
+            "decision": "HDP UNDERDOG",
+            "note": "Underdog berpotensi cover handicap walau tidak diunggulkan"
+        }
+
+    return {
+        "tag": "⛔ SKIP",
+        "decision": "NO BET",
+        "note": "Tidak ada value yang cukup kuat untuk betting"
     }
