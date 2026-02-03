@@ -35,7 +35,7 @@ CACHE_DIR = os.getenv("CACHE_DIR", "/app/cache")
 os.makedirs(CACHE_DIR, exist_ok=True)
 
 ALLOWED_LEAGUES = {
-    1, 2, 3, 39, 61, 78, 88, 98, 113, 119, 140, 144, 253, 292, 307
+    1, 2, 3, 39, 61, 78, 88, 98, 113, 119, 135, 140, 144, 253, 292, 307
 }
 SUPPORTED_LEAGUES_TEXT = (
     "*Bot ini hanya menganalisa 15 liga / kejuaraan berikut:*\n\n"
@@ -44,6 +44,7 @@ SUPPORTED_LEAGUES_TEXT = (
     "🇪🇺 UEFA Europa League\n"
     "🇬🇧 Premier League\n"
     "🇫🇷 Ligue 1\n"
+    "🇮🇹 Serie A\n"
     "🇩🇪 Bundesliga\n"
     "🇳🇱 Eredivisie\n"
     "🇯🇵 J1 League\n"
@@ -427,6 +428,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
