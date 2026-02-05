@@ -304,7 +304,7 @@ async def nickname_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data.pop("awaiting_nickname", None)
 
     await update.message.reply_text(
-        f"✅ Sip,*{nickname}* si penjudi!\n\n"
+        f"✅ Sip, WELCOME *{nickname}* si penjudi!\n\n"
         "Gunakan /prediksi atau /jadwal\n\n"
         + SUPPORTED_LEAGUES_TEXT,
         parse_mode="Markdown"
@@ -343,8 +343,7 @@ async def prediksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         now = datetime.now(WITA)
 
         lines = [
-            "🧠 *REKOMENDASI HARI INI*",
-            f"📅 {now.strftime('%d %B %Y')}",
+            "🧠 *SARAN DARI STATISTIK*",
             "━━━━━━━━━━━━━━━━━━━━━━━━━━"
         ]
 
@@ -459,6 +458,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
