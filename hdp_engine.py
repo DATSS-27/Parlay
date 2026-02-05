@@ -57,6 +57,42 @@ def adjusted_prob(base: float, home: float, away: float, weight: float) -> float
     ratio = home / total
     return base * (1 + (ratio - 0.5) * weight)
 
+def hdp_cover_prob(
+    hdp: str,
+    egd: float,
+    p_win: float,
+    p_draw: float
+) -> float:
+    """
+    Estimasi probabilitas cover HDP (Asia)
+    """
+    try:
+        line = float(hdp.split()[0])
+    except Exception:
+        return p_win
+
+    # FAVORIT
+    if line < 0:
+        need = abs(line)
+
+        # contoh: -0.5 → harus menang
+        if need == 0.5:
+            return p_win
+
+        # -0.75 / -1 → butuh margin
+        return max(0.0, p_win - max(0, need - egd) * 0.25)
+
+    # UNDERDOG
+    else:
+        # +0.5 → menang atau seri
+        if line == 0.5:
+            return p_win + p_draw
+
+        # +0.75 / +1 → masih aman kalah tipis
+        return min(
+            1.0,
+            p_win + p_draw + max(0, line + egd) * 0.25
+        )
 
 # =========================================================
 # POISSON HDP ENGINE (PRIMARY)
@@ -68,42 +104,86 @@ def poisson_hdp_engine(pred_resp: dict) -> dict:
     home = teams["home"]
     away = teams["away"]
 
+    # === Expected Goals ===
     home_xg = expected_goals(home, True)
     away_xg = expected_goals(away, False)
 
+    # === Base Poisson ===
     p_home, p_draw, p_away = poisson_probs(home_xg, away_xg)
 
+    # === Adjustments ===
     goals = comp.get("goals", {})
     att = comp.get("att", {})
     defense = comp.get("def", {})
 
+    def adj(base, a, b, w):
+        return adjusted_prob(base, pct(a), pct(b), w)
+
     p_home_adj = (
-        adjusted_prob(p_home, pct(goals.get("home")), pct(goals.get("away")), 0.20) +
-        adjusted_prob(p_home, pct(att.get("home")), pct(att.get("away")), 0.15) +
-        adjusted_prob(p_home, pct(defense.get("home")), pct(defense.get("away")), 0.10)
+        adj(p_home, goals.get("home"), goals.get("away"), 0.20) +
+        adj(p_home, att.get("home"), att.get("away"), 0.15) +
+        adj(p_home, defense.get("home"), defense.get("away"), 0.10)
     ) / 3
 
     p_away_adj = (
-        adjusted_prob(p_away, pct(goals.get("away")), pct(goals.get("home")), 0.20) +
-        adjusted_prob(p_away, pct(att.get("away")), pct(att.get("home")), 0.15) +
-        adjusted_prob(p_away, pct(defense.get("away")), pct(defense.get("home")), 0.10)
+        adj(p_away, goals.get("away"), goals.get("home"), 0.20) +
+        adj(p_away, att.get("away"), att.get("home"), 0.15) +
+        adj(p_away, defense.get("away"), defense.get("home"), 0.10)
     ) / 3
 
-    p_draw_adj = max(0.0, 1 - (p_home_adj + p_away_adj))
-    p_draw_adj = min(p_draw_adj, 0.35)
+    # === Draw handling (dynamic, lebih realistis) ===
+    p_draw_adj = max(
+        0.0,
+        1 - (p_home_adj + p_away_adj)
+    )
 
-    # ================= HANDICAP MAPPING =================
-    if p_home_adj < 0.45 and p_draw_adj > 0.25:
-        hdp_home, hdp_away = "0 (DNB)", "+0.25"
-    elif 0.45 <= p_home_adj < 0.55:
-        hdp_home, hdp_away = "-0.25", "+0.5"
-    elif 0.55 <= p_home_adj < 0.60:
-        hdp_home, hdp_away = "-0.5", "+0.75"
+    draw_cap = 0.45 - abs(home_xg - away_xg) * 0.10
+    p_draw_adj = min(p_draw_adj, max(0.25, draw_cap))
+
+    # === Normalize (safety) ===
+    total = p_home_adj + p_draw_adj + p_away_adj
+    if total > 0:
+        p_home_adj /= total
+        p_draw_adj /= total
+        p_away_adj /= total
+
+    # === Tentukan favorit ===
+    home_fav = p_home_adj >= p_away_adj
+    p_fav = max(p_home_adj, p_away_adj)
+
+    # === Match imbang → jangan maksa HDP ===
+    if abs(p_home_adj - p_away_adj) < 0.05:
+        hdp_home = "0 (DNB)"
+        hdp_away = "0 (DNB)"
     else:
-        hdp_home, hdp_away = "-0.75", "+1.0"
+        line = base_hdp_from_prob(p_fav)
+
+        if home_fav:
+            hdp_home = f"-{line}" if line > 0 else "0 (DNB)"
+            hdp_away = f"+{line + 0.25}"
+        else:
+            hdp_home = f"+{line + 0.25}"
+            hdp_away = f"-{line}"
+    egd = home_xg - away_xg
+
+    home_cover = hdp_cover_prob(
+        hdp_home, egd, p_home_adj, p_draw_adj
+    )
+    away_cover = hdp_cover_prob(
+        hdp_away, -egd, p_away_adj, p_draw_adj
+    )
+    
+    if home_cover >= away_cover:
+        best_side = "HOME"
+        best_hdp = hdp_home
+        best_cover = home_cover
+    else:
+        best_side = "AWAY"
+        best_hdp = hdp_away
+        best_cover = away_cover
 
     return {
-        "model": "poisson",
+        "model": "poisson_v2",
         "home_prob": round(p_home_adj, 3),
         "draw_prob": round(p_draw_adj, 3),
         "away_prob": round(p_away_adj, 3),
@@ -111,8 +191,27 @@ def poisson_hdp_engine(pred_resp: dict) -> dict:
         "hdp_away": hdp_away,
         "home_xg": round(home_xg, 2),
         "away_xg": round(away_xg, 2),
-    }
+        "best_hdp_side": best_side,
+        "best_hdp": best_hdp,
+        "cover_prob": round(best_cover, 3),
 
+    }
+def base_hdp_from_prob(p: float) -> float:
+    """
+    Mapping probability favorit → garis handicap Asia
+    """
+    if p < 0.44:
+        return 0.0
+    elif p < 0.50:
+        return 0.25
+    elif p < 0.56:
+        return 0.5
+    elif p < 0.62:
+        return 0.75
+    elif p < 0.68:
+        return 1.0
+    else:
+        return 1.25
 
 # =========================================================
 # SIMPLE FALLBACK ENGINE
@@ -146,9 +245,14 @@ def simple_hdp_engine(pred_resp: dict) -> dict:
 # =========================================================
 # HDP CONFIDENCE (FINAL)
 # =========================================================
-def hdp_confidence(hdp_resp: dict, home_xg: float, away_xg: float) -> int:
+def hdp_confidence(
+    hdp_resp: dict,
+    home_xg: float,
+    away_xg: float
+) -> int:
     """
-    Final HDP Confidence (0–100)
+    FINAL HDP CONFIDENCE (0–100)
+    Berdasarkan PROBABILITAS COVER, bukan menang
     """
 
     p_home = hdp_resp.get("home_prob", 0.0)
@@ -158,30 +262,50 @@ def hdp_confidence(hdp_resp: dict, home_xg: float, away_xg: float) -> int:
     hdp_home = hdp_resp.get("hdp_home", "0")
     hdp_away = hdp_resp.get("hdp_away", "0")
 
-    # Favorit side
-    cover_prob = max(p_home, p_away)
-    cover_score = cover_prob * 100 * 0.6
+    # === Expected Goal Difference ===
+    egd_home = home_xg - away_xg
+    egd_away = -egd_home
 
-    # Expected goal diff
-    egd = abs(home_xg - away_xg)
-    egd_score = min(egd * 25, 25) * 0.2
+    # === COVER PROBABILITY ===
+    home_cover = hdp_cover_prob(
+        hdp_home, egd_home, p_home, p_draw
+    )
+    away_cover = hdp_cover_prob(
+        hdp_away, egd_away, p_away, p_draw
+    )
 
-    # Draw safety
-    draw_score = (1 - p_draw) * 100 * 0.2
+    # === PILIH SISI TERBAIK ===
+    if home_cover >= away_cover:
+        cover_prob = home_cover
+        chosen_hdp = hdp_home
+    else:
+        cover_prob = away_cover
+        chosen_hdp = hdp_away
 
-    confidence = cover_score + egd_score + draw_score
+    # ================= SCORE BUILD =================
+    # 1️⃣ Cover probability (60%)
+    score = cover_prob * 100 * 0.6
 
-    # Handicap difficulty penalty
-    def hdp_val(h):
-        try:
-            return abs(float(h.split()[0]))
-        except Exception:
-            return 0.0
+    # 2️⃣ Goal diff support (20%)
+    egd_support = min(abs(egd_home) * 20, 20)
+    score += egd_support * 0.2
 
-    penalty = max(hdp_val(hdp_home), hdp_val(hdp_away)) * 6
-    confidence -= penalty
+    # 3️⃣ Draw safety (20%)
+    score += (1 - p_draw) * 100 * 0.2
 
-    return int(round(max(0, min(confidence, 100))))
+    # 4️⃣ Handicap difficulty penalty
+    try:
+        line = abs(float(chosen_hdp.split()[0]))
+    except Exception:
+        line = 0.0
+
+    score -= line * 6
+
+    return {
+        "score": int(round(max(0, min(score, 100)))),
+        "best_side": "HOME" if home_cover >= away_cover else "AWAY",
+        "cover_prob": round(max(home_cover, away_cover), 3)
+    }
 
 
 # =========================================================
@@ -192,3 +316,4 @@ def hdp_suggestion(pred_resp: dict) -> dict:
         return poisson_hdp_engine(pred_resp)
     except Exception:
         return simple_hdp_engine(pred_resp)
+
