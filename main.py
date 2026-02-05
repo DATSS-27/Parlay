@@ -85,17 +85,21 @@ def prediction_cache_path(fid: int):
     return os.path.join(CACHE_DIR, f"prediction_{fid}.json")
 
 def extract_confidence_percent(conf_str: str) -> int:
-    return int(conf_str.split("(")[1].replace("%)", ""))
+    try:
+        return int(conf_str.split("(")[1].replace("%)", ""))
+    except Exception:
+        return 50
 
 def safe_get(url, **kwargs):
+    last_exc = None
     for _ in range(2):
         try:
             r = requests.get(url, **kwargs)
             r.raise_for_status()
             return r
-        except Exception:
-            continue
-    raise
+        except Exception as e:
+            last_exc = e
+    raise last_exc
 
 
 USERS_FILE = os.path.join(CACHE_DIR, "users.json")
@@ -351,6 +355,10 @@ async def prediksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for f, pred in results:
             d = final_decision(pred)
             hdp = hdp_suggestion(pred)
+            
+            if hdp.get("engine_quality") == "fallback":
+                lines.append("⚠️ *Catatan:* HDP dihitung dengan model sederhana (data terbatas)\n")
+                
             winner_conf = extract_confidence_percent(d["confidence"])
             hdp_info = hdp_confidence(
                 hdp_resp=hdp,
@@ -364,7 +372,7 @@ async def prediksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             sync = sync_confidence(winner_conf, hdp_conf)
             label = hdp_confidence_label(hdp_conf)
-            
+
             lines.append(
                 f"{idx}️⃣ *{f['home']} vs {f['away']}*\n"
                 f"🎯 Unggulan: {d['pick']}\n"
@@ -465,6 +473,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
