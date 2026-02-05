@@ -44,9 +44,12 @@ def poisson_probs(home_xg: float, away_xg: float, max_goals: int = 5):
 # HELPERS
 # =========================================================
 def pct(val) -> float:
-    if not val:
+    try:
+        if not val:
+            return 0.0
+        return float(str(val).replace("%", "").strip()) / 100
+    except Exception:
         return 0.0
-    return float(str(val).replace("%", "").strip()) / 100
 
 
 def adjusted_prob(base: float, home: float, away: float, weight: float) -> float:
@@ -386,6 +389,7 @@ def hdp_suggestion(pred_resp: dict) -> dict:
         return poisson_hdp_engine(pred_resp)
     except Exception:
         return simple_hdp_engine(pred_resp)
+
 
 
 
