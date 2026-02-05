@@ -84,23 +84,22 @@ def fixture_cache_path():
 def prediction_cache_path(fid: int):
     return os.path.join(CACHE_DIR, f"prediction_{fid}.json")
 
-def extract_confidence_percent(conf_str: str) -> int:
+def extract_confidence_percent(conf_str) -> int:
     try:
-        return int(conf_str.split("(")[1].replace("%)", ""))
+        return int(str(conf_str).split("(")[1].replace("%)", ""))
     except Exception:
         return 50
-
-def safe_get(url, **kwargs):
+        
+def safe_get(url, timeout=15, **kwargs):
     last_exc = None
     for _ in range(2):
         try:
-            r = requests.get(url, **kwargs)
+            r = requests.get(url, timeout=timeout, **kwargs)
             r.raise_for_status()
             return r
         except Exception as e:
             last_exc = e
     raise last_exc
-
 
 USERS_FILE = os.path.join(CACHE_DIR, "users.json")
 # ================= CACHE CLEANUP =================
@@ -473,6 +472,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
