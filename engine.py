@@ -17,13 +17,21 @@ def confidence_percent(diff: float) -> int:
     Convert selisih skor → confidence %
     """
     # diff 0–30 kira-kira
-    base = diff * 3.5          # scaling
-    conf = 50 + base           # mulai dari 50%
+    base = diff * 2.8          
+    conf = 48 + base           
 
-    return int(clamp(conf, 52, 92))
+    return int(clamp(conf, 50, 88))
 
 def extract_confidence_percent(conf_str: str) -> int:
     return int(conf_str.split("(")[1].replace("%)", ""))
+
+def relative_score(a: float, b: float) -> float:
+    """
+    Skala 0–100 berbasis perbandingan langsung
+    """
+    if a + b == 0:
+        return 50.0
+    return 100 * a / (a + b)
 
 # ================= LEAGUE FORM =================
 def league_form_score(form: str) -> float:
@@ -74,13 +82,23 @@ def factor_scores(pred_resp: dict, side: str) -> dict:
 
     goals_for = float(team["last_5"]["goals"]["for"].get("average", 0))
     goals_against = float(team["last_5"]["goals"]["against"].get("average", 0))
-
+    
+    att = pct(team["last_5"].get("att"))
+    def_ = pct(team["last_5"].get("def"))
+    
+    opp = "away" if side == "home" else "home"
+    opp_team = pred_resp["teams"][opp]
+    
+    opp_att = pct(opp_team["last_5"].get("att"))
+    opp_def = pct(opp_team["last_5"].get("def"))
+    
     return {
         # === CORE ===
         "percent": clamp(pct(pred["percent"].get(side))),
         "last5_form": clamp(pct(team["last_5"].get("form"))),
-        "attack": clamp(pct(team["last_5"].get("att"))),
-        "defense": clamp(pct(team["last_5"].get("def"))),
+        
+        "attack": clamp(relative_score(att, opp_def)),
+        "defense": clamp(relative_score(def_, opp_att)),
 
         # === GOALS ===
         "goals_for": clamp(goals_for * 20),          # 2.5 gol ≈ 50
@@ -96,10 +114,10 @@ def factor_scores(pred_resp: dict, side: str) -> dict:
 
 # ================= WEIGHT CONFIG =================
 WEIGHTS = {
-    "percent": 0.22,
+    "percent": 0.12,
     "last5_form": 0.14,
-    "attack": 0.14,
-    "defense": 0.14,
+    "attack": 0.12,
+    "defense": 0.12,
     "goals_for": 0.12,
     "goals_against": 0.12,
     "league_form": 0.07,
@@ -202,3 +220,4 @@ def sync_confidence(winner_conf: int, hdp_conf: int) -> dict:
         "decision": "NO BET",
         "note": "Tidak ada value yang cukup kuat untuk betting"
     }
+
