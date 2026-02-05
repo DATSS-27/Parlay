@@ -3,9 +3,10 @@ def pct(val) -> float:
     if val is None:
         return 0.0
     if isinstance(val, (int, float)):
-        return float(val)
+        return float(val) / 100 if val > 1 else float(val)
     if isinstance(val, str):
-        return float(val.replace("%", "").strip() or 0)
+        v = float(val.replace("%", "").strip() or 0)
+        return v / 100
     return 0.0
 
 
@@ -13,17 +14,15 @@ def clamp(v: float, lo=0.0, hi=100.0) -> float:
     return max(lo, min(v, hi))
 
 def confidence_percent(diff: float) -> int:
-    """
-    Convert selisih skor → confidence %
-    """
-    # diff 0–30 kira-kira
-    base = diff * 2.8          
-    conf = 48 + base           
+    base = diff * 2.2   # turunkan agresivitas
+    conf = 50 + base
+    return int(clamp(conf, 50, 85))
 
-    return int(clamp(conf, 50, 88))
-
-def extract_confidence_percent(conf_str: str) -> int:
-    return int(conf_str.split("(")[1].replace("%)", ""))
+def extract_confidence_percent(conf_str) -> int:
+    try:
+        return int(str(conf_str).split("(")[1].replace("%)", ""))
+    except Exception:
+        return 50  # netral
 
 def relative_score(a: float, b: float) -> float:
     """
@@ -114,7 +113,7 @@ def factor_scores(pred_resp: dict, side: str) -> dict:
 
 # ================= WEIGHT CONFIG =================
 WEIGHTS = {
-    "percent": 0.12,
+    "percent": 0.09,
     "last5_form": 0.14,
     "attack": 0.12,
     "defense": 0.12,
@@ -131,11 +130,13 @@ def final_score(pred_resp: dict, side: str) -> float:
     total = 0.0
 
     for k, v in scores.items():
-        w = WEIGHTS.get(k, 0)
-        total += v * w
+        total += v * WEIGHTS.get(k, 0)
+
+    # 🔧 home bias normalization
+    if side == "home":
+        total -= 1.8   # tuning: 1.5–2.2
 
     return round(total, 2)
-
 
 # ================= FINAL DECISION =================
 def final_decision(pred_resp: dict) -> dict:
@@ -153,7 +154,7 @@ def final_decision(pred_resp: dict) -> dict:
     away_scores = factor_scores(pred_resp, "away")
 
     # === PICK LOGIC ===
-    if diff < 4:
+    if diff < 5:
         pick = "DRAW / DOUBLE CHANCE"
     elif home_score > away_score:
         pick = home_name
@@ -220,4 +221,5 @@ def sync_confidence(winner_conf: int, hdp_conf: int) -> dict:
         "decision": "NO BET",
         "note": "Tidak ada value yang cukup kuat untuk betting"
     }
+
 
