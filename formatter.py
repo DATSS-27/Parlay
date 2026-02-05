@@ -68,7 +68,7 @@ def telegram_formatter_technical(
     lines: list[str] = []
 
     # ===== HEADER =====
-    lines.append("*{fixture['league_name']}*")
+    lines.append(f"*{fixture['league_name']}*")
     lines.append(
         f"*{fixture['home']} vs {fixture['away']}*"
     )
@@ -131,4 +131,5 @@ def telegram_formatter_technical(
     )
 
     return "\n".join(lines)
+
 
