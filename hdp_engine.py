@@ -118,6 +118,16 @@ def margin_gap(egd: float, line: float) -> float:
     # clamp biar tidak liar
     return max(-1.5, min(egd - line, 1.5))
 
+def confidence_label(score: int) -> str:
+    if score < 60:
+        return "SPEKULATIF"
+    elif score < 73:
+        return "LAYAK"
+    elif score < 80:
+        return "KUAT"
+    else:
+        return "SANGAT KUAT"
+
 # =========================================================
 # POISSON HDP ENGINE (PRIMARY)
 # =========================================================
@@ -131,6 +141,10 @@ def poisson_hdp_engine(pred_resp: dict) -> dict:
     # === Expected Goals ===
     home_xg = expected_goals(home, True)
     away_xg = expected_goals(away, False)
+    
+    # === xG stability guard ===
+    home_xg = min(max(home_xg, 0.6), 3.0)
+    away_xg = min(max(away_xg, 0.6), 3.0)
 
     # === Base Poisson ===
     p_home, p_draw, p_away = poisson_probs(home_xg, away_xg)
@@ -143,17 +157,24 @@ def poisson_hdp_engine(pred_resp: dict) -> dict:
     def adj(base, a, b, w):
         return adjusted_prob(base, pct(a), pct(b), w)
 
-    p_home_adj = (
-        adj(p_home, goals.get("home"), goals.get("away"), 0.20) +
-        adj(p_home, att.get("home"), att.get("away"), 0.15) +
-        adj(p_home, defense.get("home"), defense.get("away"), 0.10)
-    ) / 3
+    home_adjustments = [
+        adj(p_home, goals.get("home"), goals.get("away"), 0.20),
+        adj(p_home, att.get("home"), att.get("away"), 0.15),
+        adj(p_home, defense.get("home"), defense.get("away"), 0.10),
+    ]
+    
+    valid_home_adj = [a for a in home_adjustments if a > 0]
+    p_home_adj = sum(valid_home_adj) / len(valid_home_adj) if valid_home_adj else p_home
 
-    p_away_adj = (
-        adj(p_away, goals.get("away"), goals.get("home"), 0.20) +
-        adj(p_away, att.get("away"), att.get("home"), 0.15) +
-        adj(p_away, defense.get("away"), defense.get("home"), 0.10)
-    ) / 3
+
+    away_adjustments = [
+        adj(p_away, goals.get("away"), goals.get("home"), 0.20),
+        adj(p_away, att.get("away"), att.get("home"), 0.15),
+        adj(p_away, defense.get("away"), defense.get("home"), 0.10),
+    ]
+    
+    valid_away_adj = [a for a in away_adjustments if a > 0]
+    p_away_adj = sum(valid_away_adj) / len(valid_away_adj) if valid_away_adj else p_away
 
     # === Draw handling (dynamic, lebih realistis) ===
     p_draw_adj = max(
@@ -347,11 +368,14 @@ def hdp_confidence(
 
     score -= line * 5
 
-    return {
+    result = {
         "score": int(round(max(0, min(score, 100)))),
         "best_side": "HOME" if home_cover >= away_cover else "AWAY",
-        "cover_prob": round(max(home_cover, away_cover), 3)
+        "cover_prob": round(max(home_cover, away_cover), 3),
     }
+    
+    result["label"] = confidence_label(result["score"])
+    return result
 
 
 # =========================================================
@@ -362,5 +386,6 @@ def hdp_suggestion(pred_resp: dict) -> dict:
         return poisson_hdp_engine(pred_resp)
     except Exception:
         return simple_hdp_engine(pred_resp)
+
 
 
