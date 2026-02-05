@@ -63,36 +63,60 @@ def hdp_cover_prob(
     p_win: float,
     p_draw: float
 ) -> float:
-    """
-    Estimasi probabilitas cover HDP (Asia)
-    """
     try:
         line = float(hdp.split()[0])
     except Exception:
         return p_win
 
-    # FAVORIT
+    # ================= FAVORIT (-) =================
     if line < 0:
         need = abs(line)
 
-        # contoh: -0.5 → harus menang
-        if need == 0.5:
-            return p_win
+        # -0.25 → half win on draw
+        if need == 0.25:
+            base = p_win + p_draw * 0.5
 
-        # -0.75 / -1 → butuh margin
-        return max(0.0, p_win - max(0, need - egd) * 0.25)
+        # -0.5 → must win
+        elif need == 0.5:
+            base = p_win
 
-    # UNDERDOG
+        # -0.75 / -1.0 / -1.25
+        else:
+            base = p_win
+
+        gap = margin_gap(egd, need)
+
+        # penalti jika margin tidak cukup
+        if gap < 0:
+            base += gap * 0.30   # penalti lebih keras
+
+        return max(0.0, min(base, 1.0))
+
+    # ================= UNDERDOG (+) =================
     else:
-        # +0.5 → menang atau seri
-        if line == 0.5:
-            return p_win + p_draw
+        # +0.25
+        if line == 0.25:
+            base = p_win + p_draw * 0.5
 
-        # +0.75 / +1 → masih aman kalah tipis
-        return min(
-            1.0,
-            p_win + p_draw + max(0, line + egd) * 0.25
-        )
+        # +0.5
+        elif line == 0.5:
+            base = p_win + p_draw
+
+        # +0.75 / +1
+        else:
+            base = p_win + p_draw
+
+        gap = margin_gap(-egd, line)
+
+        if gap > 0:
+            base += gap * 0.20   # bonus kecil, lebih konservatif
+
+        return min(1.0, max(base, 0.0))
+
+        
+def margin_gap(egd: float, line: float) -> float:
+    # clamp biar tidak liar
+    return max(-1.5, min(egd - line, 1.5))
 
 # =========================================================
 # POISSON HDP ENGINE (PRIMARY)
@@ -152,7 +176,13 @@ def poisson_hdp_engine(pred_resp: dict) -> dict:
     p_fav = max(p_home_adj, p_away_adj)
 
     # === Match imbang → jangan maksa HDP ===
-    if abs(p_home_adj - p_away_adj) < 0.05:
+    diff = abs(p_home_adj - p_away_adj)
+
+    imbang = (
+        diff < 0.06 and
+        p_draw_adj > 0.28
+    )
+    if imbang:
         hdp_home = "0 (DNB)"
         hdp_away = "0 (DNB)"
     else:
@@ -206,7 +236,7 @@ def base_hdp_from_prob(p: float) -> float:
         return 0.25
     elif p < 0.56:
         return 0.5
-    elif p < 0.62:
+    elif p < 0.64:
         return 0.75
     elif p < 0.68:
         return 1.0
@@ -222,25 +252,40 @@ def simple_hdp_engine(pred_resp: dict) -> dict:
 
     ph = pct(total.get("home"))
     pa = pct(total.get("away"))
+    pd = max(0.0, 1 - (ph + pa))
 
-    if abs(ph - pa) < 0.05:
-        hdp_home, hdp_away = "0 (DNB)", "+0.25"
+    if abs(ph - pa) < 0.06:
+        hdp_home, hdp_away = "0 (DNB)", "0 (DNB)"
     elif ph > pa:
         hdp_home, hdp_away = "-0.25", "+0.5"
     else:
         hdp_home, hdp_away = "+0.5", "-0.25"
 
+    if ph >= pa:
+        best_side = "HOME"
+        best_hdp = hdp_home
+        cover_prob = ph
+    else:
+        best_side = "AWAY"
+        best_hdp = hdp_away
+        cover_prob = pa
+
     return {
         "model": "simple",
+        "engine_quality": "fallback",
+        "warning": "⚠️ Fallback model digunakan (data tidak lengkap)",
+
         "home_prob": round(ph, 3),
-        "draw_prob": round(max(0.0, 1 - (ph + pa)), 3),
+        "draw_prob": round(pd, 3),
         "away_prob": round(pa, 3),
         "hdp_home": hdp_home,
         "hdp_away": hdp_away,
         "home_xg": 0.0,
         "away_xg": 0.0,
+        "best_hdp_side": best_side,
+        "best_hdp": best_hdp,
+        "cover_prob": round(cover_prob, 3),
     }
-
 
 # =========================================================
 # HDP CONFIDENCE (FINAL)
@@ -287,11 +332,12 @@ def hdp_confidence(
     score = cover_prob * 100 * 0.6
 
     # 2️⃣ Goal diff support (20%)
-    egd_support = min(abs(egd_home) * 20, 20)
+    egd = egd_home if chosen_hdp == hdp_home else egd_away
+    egd_support = min(abs(egd) * 20, 20)
     score += egd_support * 0.2
 
     # 3️⃣ Draw safety (20%)
-    score += (1 - p_draw) * 100 * 0.2
+    score += (1 - p_draw) * 100 * 0.15
 
     # 4️⃣ Handicap difficulty penalty
     try:
@@ -299,7 +345,7 @@ def hdp_confidence(
     except Exception:
         line = 0.0
 
-    score -= line * 6
+    score -= line * 5
 
     return {
         "score": int(round(max(0, min(score, 100)))),
@@ -316,4 +362,5 @@ def hdp_suggestion(pred_resp: dict) -> dict:
         return poisson_hdp_engine(pred_resp)
     except Exception:
         return simple_hdp_engine(pred_resp)
+
 
