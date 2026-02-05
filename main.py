@@ -352,11 +352,16 @@ async def prediksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
             d = final_decision(pred)
             hdp = hdp_suggestion(pred)
             winner_conf = extract_confidence_percent(d["confidence"])
-            hdp_conf = hdp_confidence(
+            hdp_info = hdp_confidence(
                 hdp_resp=hdp,
                 home_xg=hdp.get("home_xg", 0),
                 away_xg=hdp.get("away_xg", 0),
             )
+            
+            hdp_conf = hdp_info["score"]
+            best_side = hdp_info["best_side"]
+            cover_prob = hdp_info["cover_prob"]
+
             sync = sync_confidence(winner_conf, hdp_conf)
             label = hdp_confidence_label(hdp_conf)
             
@@ -366,7 +371,9 @@ async def prediksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 f"📊 Winner Risk: {d['confidence']}\n\n"
                 f"⚖️ *HDP Rekomendasi*\n"
                 f"• HOME {hdp['hdp_home']} | AWAY {hdp['hdp_away']}\n"
-                f"• HDP Confidence: *{hdp_conf:.0f}%* {label}\n\n"
+                f"• HDP Confidence: *{hdp_conf}%* {label}\n"
+                f"• Best Side: *{best_side}*\n"
+                f"• Cover Prob: *{int(cover_prob * 100)}%*\n\n"
                 f"{sync['tag']}\n"
                 f"🧠 {sync['note']}\n"
             )
@@ -458,6 +465,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
