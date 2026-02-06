@@ -131,5 +131,55 @@ def telegram_formatter_technical(
 
     return "\n".join(lines)
 
+def telegram_formatter_full(
+    fixture: dict,
+    home_scores: dict,
+    away_scores: dict,
+    decision: dict,
+    hdp: dict,
+    hdp_info: dict,
+    sync: dict,
+) -> str:
+    base = telegram_formatter_technical(
+        fixture=fixture,
+        home_scores=home_scores,
+        away_scores=away_scores,
+        home_total=decision["home_score"],
+        away_total=decision["away_score"],
+    )
+
+    lines = [base]
+    lines.append("━━━━━━━━━━━━━━━━━━━━")
+    lines.append("*🎯 PREDIKSI & SARAN*")
+    lines.append(f"Unggulan: *{decision['pick']}*")
+    lines.append(f"Winner Risk: *{decision['confidence']}*")
+    lines.append(f"🧠 {decision['note']}")
+    lines.append("")
+
+    # HDP warning kalau fallback
+    if hdp.get("engine_quality") == "fallback":
+        lines.append("⚠️ _HDP dihitung dengan model sederhana (data terbatas)_\n")
+
+    lines.append("*⚖️ HANDICAP (HDP)*")
+    lines.append(
+        f"HOME {hdp['hdp_home']} | AWAY {hdp['hdp_away']}"
+    )
+    lines.append(
+        f"HDP Confidence: *{hdp_info['score']}%*"
+    )
+    lines.append(
+        f"Best Side: *{hdp_info['best_side']}*"
+    )
+    lines.append(
+        f"Cover Prob: *{int(hdp_info['cover_prob'] * 100)}%*"
+    )
+    lines.append("")
+    lines.append(f"{sync['tag']}")
+    lines.append(f"🧠 {sync['note']}")
+
+    return "\n".join(lines)
+
+
+
 
 
