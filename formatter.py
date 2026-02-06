@@ -43,11 +43,10 @@ def build_insight(
         winner = home_name if d > 0 else away_name
         notes.append(f"📈 Performa liga {winner} lebih stabil +{abs(d)}")
         
-    # === H2H ===
-    if home_scores.get("h2h", 0) >= 80:
-        notes.append(f"📊 Rekor pertemuan berpihak ke {home_name}")
-    elif away_scores.get("h2h", 0) >= 80:
-        notes.append(f"📊 Rekor pertemuan berpihak ke {away_name}")
+    d = diff(home_scores["h2h"], away_scores["h2h"])
+    if abs(d) >= 12:
+        winner = home_name if d > 0 else away_name
+        notes.append(f"📊 Rekor pertemuan condong ke {winner}")
 
     return notes[:3]
 
@@ -64,7 +63,7 @@ def telegram_formatter_technical(
     ).astimezone(WITA)
 
     delta = round(home_total - away_total, 2)
-
+    leader = fixture["home"] if delta > 0 else fixture["away"]
     lines: list[str] = []
 
     # ===== HEADER =====
@@ -77,7 +76,7 @@ def telegram_formatter_technical(
     # ===== SUMMARY =====
     lines.append("*PERBANDINGAN*")
     lines.append(f"{fixture['home']} ({home_total:.1f}) VS {fixture['away']} ({away_total:.1f})")
-    lines.append(f"Selisih : {delta:+.1f}\n")
+    lines.append(f"Unggul sementara: *{leader}* ({delta:+.1f})")
 
     # ===== TECH INSIGHT =====
     insights = build_insight(
@@ -131,5 +130,6 @@ def telegram_formatter_technical(
     )
 
     return "\n".join(lines)
+
 
 
