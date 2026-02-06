@@ -337,17 +337,16 @@ async def prediksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         for f, pred in results:
             decision = final_decision(pred)
-
             hdp = hdp_suggestion(pred)
             hdp_info = hdp_confidence(
                 hdp_resp=hdp,
                 home_xg=hdp.get("home_xg", 0),
                 away_xg=hdp.get("away_xg", 0),
             )
-
+        
             winner_conf = extract_confidence_percent(decision["confidence"])
             sync = sync_confidence(winner_conf, hdp_info["score"])
-
+        
             text = telegram_formatter_full(
                 fixture=f,
                 home_scores=factor_scores(pred, "home"),
@@ -357,11 +356,10 @@ async def prediksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 hdp_info=hdp_info,
                 sync=sync,
             )
+        
+            await update.message.reply_text(text, parse_mode="Markdown")
+            await asyncio.sleep(0.35)  # anti flood
 
-            await update.message.reply_text(
-                text,
-                parse_mode="Markdown"
-            )
 
     except Exception:
         logger.exception("Error saat prediksi")
@@ -439,6 +437,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
