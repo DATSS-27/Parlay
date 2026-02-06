@@ -71,6 +71,25 @@ logger = logging.getLogger("BOT")
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("telegram").setLevel(logging.WARNING)
 
+def send_long_message(update, text, parse_mode="Markdown", limit=3900):
+    """
+    Kirim pesan panjang dengan auto-split agar tidak kena limit Telegram
+    """
+    parts = []
+    current = ""
+
+    for line in text.split("\n"):
+        if len(current) + len(line) + 1 > limit:
+            parts.append(current)
+            current = line
+        else:
+            current += "\n" + line if current else line
+
+    if current:
+        parts.append(current)
+
+    return parts
+
 # ================= UTIL =================
 def _today_str():
     return datetime.now(WITA).strftime("%Y-%m-%d")
@@ -391,10 +410,13 @@ async def prediksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
             "💳 ISAKU: 081343924182"
         ])
         
-        await update.message.reply_text(
-            "\n".join(lines),
-            parse_mode="Markdown"
-        )
+        full_text = "\n".join(lines)
+
+        for chunk in send_long_message(update, full_text):
+            await update.message.reply_text(
+                chunk,
+                parse_mode="Markdown"
+            )
 
     except Exception:
         logger.exception("Error saat prediksi")
@@ -472,6 +494,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
