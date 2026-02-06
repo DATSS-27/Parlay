@@ -426,7 +426,7 @@ async def jadwal(update: Update, context: ContextTypes.DEFAULT_TYPE):
             )
 
             count += 1
-            if count >= 15:  # batasi biar tidak kepanjangan
+            if count >= 30:  # batasi biar tidak kepanjangan
                 break
 
         if count == 0:
@@ -472,6 +472,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
