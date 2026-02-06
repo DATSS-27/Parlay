@@ -16,7 +16,7 @@ from telegram.ext import (
 )
 
 from engine import factor_scores, final_decision, sync_confidence
-from formatter import telegram_formatter_technical
+from formatter import telegram_formatter_technical, telegram_formatter_full
 from hdp_engine import hdp_suggestion, hdp_confidence
 
 # ================= CONFIG =================
@@ -337,84 +337,34 @@ async def prediksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         results = collect_predictions()
 
         if not results:
-            await update.message.reply_text(
-                "❌ Tidak ada prediksi tersedia."
-            )
+            await update.message.reply_text("❌ Tidak ada prediksi tersedia.")
             return
 
-        # =====================
-        # PART 1: DETAIL PREDIKSI (SEPERTI AWAL)
-        # =====================
         for f, pred in results:
             decision = final_decision(pred)
 
-            text = telegram_formatter_technical(
-                fixture=f,
-                home_scores=factor_scores(pred, "home"),
-                away_scores=factor_scores(pred, "away"),
-                home_total=decision["home_score"],
-                away_total=decision["away_score"],
-            )
-
-            await update.message.reply_text(text, parse_mode="Markdown")
-
-
-        # =====================
-        # PART 2: REKOMENDASI (DITARUH DI AKHIR)
-        # =====================
-        now = datetime.now(WITA)
-
-        lines = [
-            "🧠 *SARAN DARI STATISTIK*",
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        ]
-
-        idx = 1
-        for f, pred in results:
-            d = final_decision(pred)
             hdp = hdp_suggestion(pred)
-            
-            if hdp.get("engine_quality") == "fallback":
-                lines.append("⚠️ *Catatan:* HDP dihitung dengan model sederhana (data terbatas)\n")
-                
-            winner_conf = extract_confidence_percent(d["confidence"])
             hdp_info = hdp_confidence(
                 hdp_resp=hdp,
                 home_xg=hdp.get("home_xg", 0),
                 away_xg=hdp.get("away_xg", 0),
             )
-            
-            hdp_conf = hdp_info["score"]
-            best_side = hdp_info["best_side"]
-            cover_prob = hdp_info["cover_prob"]
 
-            sync = sync_confidence(winner_conf, hdp_conf)
-            label = hdp_confidence_label(hdp_conf)
+            winner_conf = extract_confidence_percent(decision["confidence"])
+            sync = sync_confidence(winner_conf, hdp_info["score"])
 
-            lines.append(
-                f"{idx}️⃣ *{f['home']} vs {f['away']}*\n"
-                f"🎯 Unggulan: {d['pick']}\n"
-                f"📊 Winner Risk: {d['confidence']}\n\n"
-                f"⚖️ *HDP Rekomendasi*\n"
-                f"• HOME {hdp['hdp_home']} | AWAY {hdp['hdp_away']}\n"
-                f"• HDP Confidence: *{hdp_conf}%* {label}\n"
-                f"• Best Side: *{best_side}*\n"
-                f"• Cover Prob: *{int(cover_prob * 100)}%*\n\n"
-                f"{sync['tag']}\n"
-                f"🧠 {sync['note']}\n"
+            text = telegram_formatter_full(
+                fixture=f,
+                home_scores=factor_scores(pred, "home"),
+                away_scores=factor_scores(pred, "away"),
+                decision=decision,
+                hdp=hdp,
+                hdp_info=hdp_info,
+                sync=sync,
             )
-            idx += 1
-        lines.extend([
-            "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-            "🙏 TERIMA DONASI FOR SERVER",
-            "💳 ISAKU: 081343924182"
-        ])
-        
-        full_text = "\n".join(lines)
 
-        for chunk in send_long_message(update, full_text):
             await update.message.reply_text(
-                chunk,
+                text,
                 parse_mode="Markdown"
             )
 
@@ -423,6 +373,7 @@ async def prediksi(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             "⚠️ Terjadi error saat memproses prediksi. Coba lagi nanti."
         )
+
 
 async def jadwal(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -494,6 +445,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
