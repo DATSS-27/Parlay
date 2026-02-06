@@ -122,13 +122,7 @@ def telegram_formatter_technical(
         f"{fmt(away_total)}"
     )
     lines.append("```")
-
-    # ===== FOOTNOTE =====
-    lines.append(
-        "Note:\n"
-        "*Rumus Sandiri Jo, Supaya kita nda dpa kse salah...*"
-    )
-
+    
     return "\n".join(lines)
 
 def telegram_formatter_full(
@@ -178,6 +172,7 @@ def telegram_formatter_full(
     lines.append(f"🧠 {sync['note']}")
 
     return "\n".join(lines)
+
 
 
 
